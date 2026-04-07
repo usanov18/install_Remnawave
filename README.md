@@ -1,6 +1,11 @@
-# Скрипт установки Remnawave
+# Скрипты для Remnawave
 
-Интерактивный скрипт для установки `Remnawave panel + страницы подписок` на один сервер.
+В репозитории два основных скрипта:
+
+- `deploy-remnawave.sh` для установки `Remnawave panel + страницы подписок`
+- `cleanup-remnawave.sh` для полной очистки именно этой установки перед новым прогоном
+
+Оба скрипта рассчитаны на один сервер.
 
 Сценарий работы максимально простой:
 
@@ -29,6 +34,19 @@
 
 Скрипт не устанавливает Remnawave node.
 
+## Что делает скрипт очистки
+
+`cleanup-remnawave.sh` автоматически:
+
+- удаляет контейнеры `remnawave`, `remnawave-db`, `remnawave-redis`, `remnawave-subscription-page`, `remnawave-caddy`;
+- удаляет volumes и сеть, созданные этой установкой;
+- удаляет директорию `/opt/remnawave-stack`;
+- удаляет лог установки `/var/log/remnawave-deploy.log`;
+- после завершения удаляет свой временный лог очистки;
+- оставляет нетронутыми `remnanode`, Docker, UFW и другие посторонние сервисы сервера.
+
+Этот скрипт нужен, если вы хотите вернуть сервер в состояние перед новым прогоном install-скрипта.
+
 ## Что такое Caddy
 
 В этом сценарии `Caddy` это веб-сервер и reverse proxy перед панелью и страницей подписок.
@@ -53,11 +71,18 @@
 
 ## Как запустить
 
-На любом сервере можно запустить так:
+На любом сервере установку можно запустить так:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/usanov18/install_Remnawave/main/deploy-remnawave.sh -o deploy-remnawave.sh
 sudo bash deploy-remnawave.sh
+```
+
+Очистку этой установки на любом сервере можно запустить так:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/usanov18/install_Remnawave/main/cleanup-remnawave.sh -o cleanup-remnawave.sh
+sudo bash cleanup-remnawave.sh
 ```
 
 При обычном запуске на чистом сервере скрипт спрашивает только:
