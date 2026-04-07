@@ -68,11 +68,11 @@ print_rule() {
 print_intro() {
     printf '\n'
     print_rule
-    printf '%bRemnawave Panel + Subscription Deployment%b\n' "${C_BOLD}${C_BLUE}" "${C_RESET}"
+    printf '%bУстановка Remnawave Panel + Страницы Подписок%b\n' "${C_BOLD}${C_BLUE}" "${C_RESET}"
     print_rule
-    printf 'This wizard installs the panel, HTTPS, and the subscription page.\n'
-    printf 'One manual step remains during setup: create the superadmin and API token.\n'
-    printf '%bLog file:%b %s\n' "${C_DIM}" "${C_RESET}" "$LOG_FILE"
+    printf 'Этот мастер установит панель, HTTPS и страницу подписок.\n'
+    printf 'Во время установки останется только один ручной шаг: создать superadmin и API токен.\n'
+    printf '%bФайл лога:%b %s\n' "${C_DIM}" "${C_RESET}" "$LOG_FILE"
 }
 
 start_stage() {
@@ -82,7 +82,7 @@ start_stage() {
     CURRENT_STAGE=$((CURRENT_STAGE + 1))
     printf '\n'
     print_rule
-    printf '%bStage %s/%s%b | %s\n' "${C_BOLD}${C_BLUE}" "$CURRENT_STAGE" "$TOTAL_STAGES" "${C_RESET}" "$title"
+    printf '%bЭтап %s/%s%b | %s\n' "${C_BOLD}${C_BLUE}" "$CURRENT_STAGE" "$TOTAL_STAGES" "${C_RESET}" "$title"
     if [[ -n "$hint" ]]; then
         printf '%s\n' "$hint"
     fi
@@ -98,7 +98,7 @@ success() {
 }
 
 note() {
-    printf '%b[NOTE]%b %s\n' "${C_DIM}" "${C_RESET}" "$*"
+    printf '%b[ЗАМЕТКА]%b %s\n' "${C_DIM}" "${C_RESET}" "$*"
 }
 
 warn() {
@@ -112,7 +112,7 @@ die() {
 
 tail_log_excerpt() {
     if [[ -f "$LOG_FILE" ]]; then
-        warn "Last lines from ${LOG_FILE}:"
+        warn "Последние строки из ${LOG_FILE}:"
         tail -n 20 "$LOG_FILE" >&2 || true
     fi
 }
@@ -127,7 +127,7 @@ run_logged() {
         return 0
     fi
 
-    warn "${label} failed."
+    warn "Шаг завершился ошибкой: ${label}"
     tail_log_excerpt
     return 1
 }
@@ -136,28 +136,28 @@ bool_to_yes_no() {
     local value="$1"
 
     if [[ "$value" == "true" ]]; then
-        printf 'yes'
+        printf 'да'
     else
-        printf 'no'
+        printf 'нет'
     fi
 }
 
 on_error() {
     local line="$1"
-    warn "The script stopped at line ${line}. Review the message above and ${LOG_FILE}."
+    warn "Скрипт остановился на строке ${line}. Проверьте сообщение выше и лог ${LOG_FILE}."
 }
 
 trap 'on_error "$LINENO"' ERR
 
 require_root() {
     if [[ "${EUID}" -ne 0 ]]; then
-        die "Run the script as root: sudo bash $0"
+        die "Запустите скрипт от root: sudo bash $0"
     fi
 }
 
 require_supported_os() {
     if [[ ! -f /etc/os-release ]]; then
-        die "Unable to detect the Linux distribution."
+        die "Не удалось определить дистрибутив Linux."
     fi
 
     # shellcheck disable=SC1091
@@ -167,7 +167,7 @@ require_supported_os() {
         ubuntu|debian)
             ;;
         *)
-            die "Only Ubuntu and Debian are supported. Detected: ${PRETTY_NAME:-unknown}"
+            die "Поддерживаются только Ubuntu и Debian. Обнаружено: ${PRETTY_NAME:-unknown}"
             ;;
     esac
 
@@ -175,7 +175,7 @@ require_supported_os() {
     OS_VERSION_CODENAME="${VERSION_CODENAME:-}"
 
     if [[ -z "$OS_VERSION_CODENAME" ]]; then
-        die "Unable to detect the system codename."
+        die "Не удалось определить системный codename."
     fi
 }
 
@@ -276,8 +276,8 @@ detect_ssh_port() {
 install_base_packages() {
     export DEBIAN_FRONTEND=noninteractive
 
-    run_logged "Refreshing apt package index" apt-get update -y
-    run_logged "Installing base packages" apt-get install -y \
+    run_logged "Обновление списка пакетов apt" apt-get update -y
+    run_logged "Установка базовых пакетов" apt-get install -y \
         ca-certificates \
         curl \
         gnupg \
@@ -290,12 +290,12 @@ install_base_packages() {
 
 install_docker() {
     if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-        success "Docker and Compose are already installed."
+        success "Docker и Compose уже установлены."
         systemctl enable --now docker >/dev/null 2>&1 || true
         return
     fi
 
-    log "Installing Docker Engine and the Compose plugin..."
+    log "Устанавливаю Docker Engine и плагин Compose..."
     install -m 0755 -d /etc/apt/keyrings
 
     if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
@@ -308,25 +308,25 @@ install_docker() {
         "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${OS_ID} ${OS_VERSION_CODENAME} stable" \
         >/etc/apt/sources.list.d/docker.list
 
-    run_logged "Refreshing apt package index after adding Docker repository" apt-get update -y
-    run_logged "Installing Docker packages" apt-get install -y \
+    run_logged "Обновление списка пакетов после добавления репозитория Docker" apt-get update -y
+    run_logged "Установка пакетов Docker" apt-get install -y \
         containerd.io \
         docker-buildx-plugin \
         docker-ce \
         docker-ce-cli \
         docker-compose-plugin
 
-    run_logged "Enabling Docker service" systemctl enable --now docker
+    run_logged "Включение службы Docker" systemctl enable --now docker
 }
 
 configure_firewall() {
-    log "Configuring UFW..."
+    log "Настраиваю UFW..."
 
     ufw allow "${SSH_PORT}/tcp" >>"$LOG_FILE" 2>&1
     ufw allow 80/tcp >>"$LOG_FILE" 2>&1
     ufw allow 443/tcp >>"$LOG_FILE" 2>&1
     ufw --force enable >>"$LOG_FILE" 2>&1
-    success "Firewall rules are ready."
+    success "Правила firewall готовы."
 }
 
 port_is_busy() {
@@ -385,11 +385,11 @@ free_port() {
         return 0
     fi
 
-    warn "Port ${port} is busy (${label})."
+    warn "Порт ${port} занят (${label})."
     print_port_info "$port"
 
-    if ! confirm "Free port ${port} automatically?" "Y"; then
-        die "Port ${port} must be free to continue."
+    if ! confirm "Освободить порт ${port} автоматически?" "Y"; then
+        die "Для продолжения порт ${port} должен быть свободен."
     fi
 
     stop_docker_publishers "$port"
@@ -400,9 +400,9 @@ free_port() {
     kill_port_processes "$port"
 
     if port_is_busy "$port"; then
-        warn "Port ${port} is still busy after automatic cleanup."
+        warn "Порт ${port} всё ещё занят после автоматической очистки."
         print_port_info "$port"
-        die "Free port ${port} and run the script again."
+        die "Освободите порт ${port} и запустите скрипт ещё раз."
     fi
 }
 
@@ -413,7 +413,7 @@ check_dns_for_domain() {
     resolved_ips="$(getent ahostsv4 "$domain" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ')"
 
     if [[ -z "$resolved_ips" ]]; then
-        warn "DNS for ${domain} is not resolving yet."
+        warn "DNS для ${domain} пока не резолвится."
         DNS_WARNING="true"
         return 0
     fi
@@ -423,12 +423,12 @@ check_dns_for_domain() {
         return 0
     fi
 
-    warn "DNS ${domain} points to: ${resolved_ips}. Expected server IP: ${PUBLIC_IP}."
+    warn "DNS ${domain} сейчас указывает на: ${resolved_ips}. Ожидаемый IP сервера: ${PUBLIC_IP}."
     DNS_WARNING="true"
 }
 
 prepare_workdirs() {
-    run_logged "Preparing local deployment directories" install -d -m 0755 "$PANEL_DIR" "$SUB_DIR" "$PROXY_DIR"
+    run_logged "Подготовка рабочих директорий" install -d -m 0755 "$PANEL_DIR" "$SUB_DIR" "$PROXY_DIR"
 }
 
 download_file() {
@@ -461,11 +461,11 @@ random_string() {
 }
 
 fetch_official_panel_files() {
-    log "Downloading the latest official Remnawave panel files..."
+    log "Скачиваю актуальные официальные файлы панели Remnawave..."
     download_file "$BACKEND_COMPOSE_URL" "$PANEL_DIR/docker-compose.yml"
     download_file "$BACKEND_ENV_URL" "$PANEL_DIR/.env"
     chmod 600 "$PANEL_DIR/.env"
-    success "Panel files downloaded."
+    success "Файлы панели скачаны."
 }
 
 configure_panel_env() {
@@ -505,11 +505,11 @@ configure_panel_env() {
 }
 
 fetch_official_sub_files() {
-    log "Downloading the latest official subscription page files..."
+    log "Скачиваю актуальные официальные файлы страницы подписок..."
     download_file "$SUB_COMPOSE_URL" "$SUB_DIR/docker-compose.yml"
     download_file "$SUB_ENV_URL" "$SUB_DIR/.env"
     chmod 600 "$SUB_DIR/.env"
-    success "Subscription page files downloaded."
+    success "Файлы страницы подписок скачаны."
 }
 
 configure_sub_env() {
@@ -602,18 +602,18 @@ cleanup_existing_remnawave() {
         return 0
     fi
 
-    log "Stopping existing Remnawave containers if they exist..."
+    log "Останавливаю существующие контейнеры Remnawave, если они есть..."
     docker rm -f remnawave remnawave-db remnawave-redis remnawave-subscription-page remnawave-caddy >/dev/null 2>&1 || true
-    success "Old Remnawave containers were checked."
+    success "Проверка старых контейнеров Remnawave завершена."
 
     if [[ "$CLEAN_INSTALL" == "true" ]]; then
-        log "Removing old Remnawave volumes on request..."
+        log "Удаляю старые тома Remnawave по запросу..."
         docker volume rm -f \
             remnawave-db-data \
             valkey-socket \
             remnawave-proxy_caddy_data \
             remnawave-proxy_caddy_config >/dev/null 2>&1 || true
-        success "Requested old volumes were removed."
+        success "Запрошенные старые тома удалены."
     fi
 }
 
@@ -712,15 +712,15 @@ create_temporary_verification_user() {
     expire_at="$(date -u -d '+1 day' '+%Y-%m-%dT%H:%M:%SZ')"
     payload="$(jq -nc --arg username "$TEMP_VERIFY_USERNAME" --arg expireAt "$expire_at" '{username: $username, expireAt: $expireAt}')"
 
-    log "Creating a temporary verification user..."
+    log "Создаю временного пользователя для проверки..."
     api_request POST "https://${ADMIN_DOMAIN}/api/users" "$payload"
 
     if [[ ! "$LAST_API_RESPONSE_CODE" =~ ^(200|201)$ ]]; then
-        warn "Unable to create the temporary verification user (HTTP ${LAST_API_RESPONSE_CODE})."
+        warn "Не удалось создать временного пользователя для проверки (HTTP ${LAST_API_RESPONSE_CODE})."
         local api_error=""
         api_error="$(extract_api_error_message)"
         if [[ -n "$api_error" ]]; then
-            warn "API response: ${api_error}"
+            warn "Ответ API: ${api_error}"
         fi
         TEMP_VERIFY_RESULT="warning"
         return 1
@@ -730,13 +730,13 @@ create_temporary_verification_user() {
     TEMP_VERIFY_SUB_URL="$(jq -r '.response.subscriptionUrl // empty' <<<"$LAST_API_RESPONSE_BODY")"
 
     if [[ -z "$TEMP_VERIFY_USER_UUID" || -z "$TEMP_VERIFY_SUB_URL" ]]; then
-        warn "The API response did not include the verification user UUID or subscription URL."
+        warn "В ответе API нет UUID временного пользователя или ссылки подписки."
         TEMP_VERIFY_RESULT="warning"
         return 1
     fi
 
-    success "Temporary verification user created: ${TEMP_VERIFY_USERNAME}"
-    note "Temporary subscription URL: ${TEMP_VERIFY_SUB_URL}"
+    success "Временный пользователь для проверки создан: ${TEMP_VERIFY_USERNAME}"
+    note "Временная ссылка подписки: ${TEMP_VERIFY_SUB_URL}"
     return 0
 }
 
@@ -749,9 +749,9 @@ delete_temporary_verification_user() {
 
     if [[ "$LAST_API_RESPONSE_CODE" =~ ^(200|204)$ ]]; then
         TEMP_VERIFY_USER_DELETED="true"
-        success "Temporary verification user removed."
+        success "Временный пользователь для проверки удалён."
     else
-        warn "Unable to delete the temporary verification user automatically (HTTP ${LAST_API_RESPONSE_CODE})."
+        warn "Не удалось автоматически удалить временного пользователя для проверки (HTTP ${LAST_API_RESPONSE_CODE})."
         TEMP_VERIFY_USER_DELETED="false"
     fi
 }
@@ -771,10 +771,10 @@ verify_temporary_subscription_link() {
         return 0
     fi
 
-    log "Checking the real subscription URL..."
+    log "Проверяю реальную ссылку подписки..."
     if wait_for_http_code_match "$TEMP_VERIFY_SUB_URL" '^(200|301|302)$' 30; then
         public_code="$(http_code_for_url "$TEMP_VERIFY_SUB_URL")"
-        success "The temporary subscription URL is reachable (HTTP ${public_code})."
+        success "Временная ссылка подписки доступна (HTTP ${public_code})."
         TEMP_VERIFY_RESULT="success"
     else
         short_uuid="${TEMP_VERIFY_SUB_URL##*/}"
@@ -782,13 +782,13 @@ verify_temporary_subscription_link() {
 
         if wait_for_http_code_match "$fallback_url" '^(200|301|302)$' 30; then
             fallback_code="$(http_code_for_url "$fallback_url")"
-            warn "The public subscription URL did not confirm in time, but the backend fallback endpoint is reachable (HTTP ${fallback_code})."
-            note "You can still test the public link manually: ${TEMP_VERIFY_SUB_URL}"
+            warn "Публичная ссылка подписки не подтвердилась вовремя, но резервный endpoint backend доступен (HTTP ${fallback_code})."
+            note "Ссылку всё ещё можно проверить вручную: ${TEMP_VERIFY_SUB_URL}"
             TEMP_VERIFY_RESULT="warning"
         else
             public_code="$(http_code_for_url "$TEMP_VERIFY_SUB_URL")"
-            warn "The temporary subscription URL could not be verified automatically (HTTP ${public_code:-unknown})."
-            note "Test it manually after deployment: ${TEMP_VERIFY_SUB_URL}"
+            warn "Не удалось автоматически проверить временную ссылку подписки (HTTP ${public_code:-unknown})."
+            note "Проверьте её вручную после установки: ${TEMP_VERIFY_SUB_URL}"
             TEMP_VERIFY_RESULT="warning"
         fi
     fi
@@ -797,7 +797,7 @@ verify_temporary_subscription_link() {
         delete_temporary_verification_user
     elif [[ "$TEMP_VERIFY_RESULT" != "success" ]]; then
         TEMP_VERIFY_USER_DELETED="false"
-        note "The temporary verification user was kept so you can inspect the link manually."
+        note "Временный пользователь сохранён, чтобы вы могли проверить ссылку вручную."
     fi
 }
 
@@ -807,8 +807,8 @@ prompt_install_mode() {
     fi
 
     if docker volume inspect remnawave-db-data >/dev/null 2>&1; then
-        warn "Existing Remnawave data was found."
-        if confirm "Run a clean reinstall and remove the old database and Caddy cert data?" "N"; then
+        warn "Найдены существующие данные Remnawave."
+        if confirm "Выполнить чистую переустановку и удалить старую базу и сертификаты Caddy?" "N"; then
             CLEAN_INSTALL="true"
         fi
     fi
@@ -817,15 +817,15 @@ prompt_install_mode() {
 show_configuration_summary() {
     cat <<EOF
 
-Configuration review:
-- Admin panel domain: ${ADMIN_DOMAIN}
-- Subscription domain: ${SUB_DOMAIN}
-- Let's Encrypt email: ${LETSENCRYPT_EMAIL:-automatic default}
-- SSH port kept open: ${SSH_PORT}
-- Server IP detected for DNS checks: ${PUBLIC_IP:-not detected}
-- Clean reinstall requested: $(bool_to_yes_no "$CLEAN_INSTALL")
-- Temporary verification user: $(bool_to_yes_no "$ENABLE_TEMP_USER_CHECK")
-- Auto-delete verification user: $(bool_to_yes_no "$AUTO_DELETE_TEMP_USER")
+Проверка конфигурации:
+- Домен админ-панели: ${ADMIN_DOMAIN}
+- Домен страницы подписок: ${SUB_DOMAIN}
+- Email для Let's Encrypt: ${LETSENCRYPT_EMAIL:-автоматический режим по умолчанию}
+- SSH порт, который останется открыт: ${SSH_PORT}
+- IP сервера для проверки DNS: ${PUBLIC_IP:-не определён}
+- Чистая переустановка: $(bool_to_yes_no "$CLEAN_INSTALL")
+- Временный пользователь для проверки: $(bool_to_yes_no "$ENABLE_TEMP_USER_CHECK")
+- Автоудаление временного пользователя: $(bool_to_yes_no "$AUTO_DELETE_TEMP_USER")
 
 EOF
 }
@@ -834,15 +834,15 @@ prompt_main_inputs() {
     PUBLIC_IP="$(detect_public_ip)"
     SSH_PORT="$(detect_ssh_port)"
 
-    log "This script deploys the panel and the subscription page only."
-    log "It does not deploy a Remnawave node."
-    log "Install directory: ${WORKDIR}"
+    log "Этот скрипт устанавливает только панель и страницу подписок."
+    log "Remnawave node он не устанавливает."
+    log "Рабочая директория установки: ${WORKDIR}"
     if [[ -n "$PUBLIC_IP" ]]; then
-        note "Detected public server IP: ${PUBLIC_IP}"
+        note "Определён публичный IP сервера: ${PUBLIC_IP}"
     fi
 
-    prompt_value ADMIN_DOMAIN "Admin panel domain" "$DEFAULT_ADMIN_DOMAIN"
-    prompt_value SUB_DOMAIN "Subscription page domain" "$DEFAULT_SUB_DOMAIN"
+    prompt_value ADMIN_DOMAIN "Домен админ-панели" "$DEFAULT_ADMIN_DOMAIN"
+    prompt_value SUB_DOMAIN "Домен страницы подписок" "$DEFAULT_SUB_DOMAIN"
     LETSENCRYPT_EMAIL="${RW_LETSENCRYPT_EMAIL:-}"
     SSH_PORT="${RW_SSH_PORT:-$SSH_PORT}"
     ENABLE_TEMP_USER_CHECK="${RW_ENABLE_TEMP_USER_CHECK:-true}"
@@ -854,65 +854,65 @@ show_dns_warning_if_needed() {
         return 0
     fi
 
-    warn "For TLS certificates, the A records must point to ${PUBLIC_IP:-the server IP}."
-    if ! confirm "Continue anyway? Caddy will obtain certificates once DNS is correct." "Y"; then
-        die "Fix the DNS records and run the script again."
+    warn "Для выпуска TLS-сертификатов A-записи должны указывать на ${PUBLIC_IP:-IP этого сервера}."
+    if ! confirm "Продолжить всё равно? Caddy выпустит сертификаты, когда DNS станет правильным." "Y"; then
+        die "Исправьте DNS-записи и запустите скрипт ещё раз."
     fi
 }
 
 deploy_panel_stack() {
-    run_logged "Starting the base panel stack" docker_compose_panel up -d
+    run_logged "Запуск базового стека панели" docker_compose_panel up -d
 
     if ! wait_for_container_health remnawave-db 120; then
-        die "The remnawave-db container did not become healthy."
+        die "Контейнер remnawave-db не перешёл в состояние healthy."
     fi
 
     if ! wait_for_container_health remnawave-redis 120; then
-        die "The remnawave-redis container did not become healthy."
+        die "Контейнер remnawave-redis не перешёл в состояние healthy."
     fi
 
     if ! wait_for_container_health remnawave 240; then
         docker logs --tail 100 remnawave || true
-        die "The remnawave container did not become healthy."
+        die "Контейнер remnawave не перешёл в состояние healthy."
     fi
 
-    success "The Remnawave panel containers are healthy."
+    success "Контейнеры панели Remnawave работают штатно."
 }
 
 deploy_proxy_panel_only() {
     write_proxy_compose
     write_caddyfile "panel-only"
 
-    run_logged "Starting the reverse proxy with TLS" docker_compose_proxy up -d
+    run_logged "Запуск обратного прокси с TLS" docker_compose_proxy up -d
 
     if wait_for_http_code_match "https://${ADMIN_DOMAIN}" '^(200|301|302|401|403)$' 120; then
-        success "The admin panel is responding at https://${ADMIN_DOMAIN}"
+        success "Админ-панель отвечает по адресу https://${ADMIN_DOMAIN}"
     else
-        warn "https://${ADMIN_DOMAIN} is not responding yet. This is usually DNS propagation or certificate issuance delay."
+        warn "https://${ADMIN_DOMAIN} пока не отвечает. Обычно это связано с распространением DNS или ожиданием сертификата."
     fi
 }
 
 pause_for_superadmin_and_api_token() {
     cat <<EOF
 
-Manual step in the panel:
-1. Open https://${ADMIN_DOMAIN}
-2. Create the superadmin account
-3. Open Remnawave Settings -> API Tokens
-4. Create an API token for the subscription page
-5. Return here and paste the token
+Ручной шаг в панели:
+1. Откройте https://${ADMIN_DOMAIN}
+2. Создайте superadmin
+3. Откройте Remnawave Settings -> API Tokens
+4. Создайте API токен для страницы подписок
+5. Вернитесь сюда и вставьте токен
 
-The token input is hidden while you paste it. That is normal.
+Во время вставки ввод токена скрыт. Это нормально.
 
 EOF
 
     while true; do
-        prompt_value API_TOKEN "Paste the Remnawave API token" "" "true"
+        prompt_value API_TOKEN "Вставьте API токен Remnawave" "" "true"
         if [[ -n "$API_TOKEN" ]]; then
-            success "API token received."
+            success "API токен получен."
             break
         fi
-        warn "The API token cannot be empty."
+        warn "API токен не может быть пустым."
     done
 }
 
@@ -920,21 +920,21 @@ deploy_subscription_stack() {
     fetch_official_sub_files
     configure_sub_env
 
-    run_logged "Starting the subscription page" docker_compose_sub up -d
+    run_logged "Запуск страницы подписок" docker_compose_sub up -d
 
     if ! wait_for_container_health remnawave-subscription-page 120; then
         if ! docker ps --format '{{.Names}}' | grep -qx 'remnawave-subscription-page'; then
             docker_compose_sub ps || true
         fi
         docker logs --tail 100 remnawave-subscription-page || true
-        die "The remnawave-subscription-page container did not start correctly."
+        die "Контейнер remnawave-subscription-page не запустился корректно."
     fi
 
     write_caddyfile "full"
     if ! docker exec remnawave-caddy caddy reload --config /etc/caddy/Caddyfile >>"$LOG_FILE" 2>&1; then
-        run_logged "Restarting the reverse proxy after updating the Caddyfile" docker_compose_proxy up -d
+        run_logged "Перезапуск обратного прокси после обновления Caddyfile" docker_compose_proxy up -d
     else
-        success "Caddy configuration reloaded."
+        success "Конфигурация Caddy перезагружена."
     fi
 
     if wait_for_http_code_match "https://${SUB_DOMAIN}" '^[1-5][0-9][0-9]$' 120; then
@@ -942,13 +942,13 @@ deploy_subscription_stack() {
         sub_status_code="$(http_code_for_url "https://${SUB_DOMAIN}")"
 
         if [[ "$sub_status_code" == "502" ]]; then
-            warn "https://${SUB_DOMAIN} is reachable over HTTPS, but the root URL currently returns HTTP 502."
-            warn "This can be normal when the subscription page is opened only through individual user links."
+            warn "https://${SUB_DOMAIN} доступен по HTTPS, но корневой URL сейчас возвращает HTTP 502."
+            warn "Это может быть нормой, если страница подписок используется только через персональные ссылки пользователей."
         else
-            success "The subscription page endpoint is reachable at https://${SUB_DOMAIN} (HTTP ${sub_status_code})."
+            success "Страница подписок доступна по адресу https://${SUB_DOMAIN} (HTTP ${sub_status_code})."
         fi
     else
-        warn "https://${SUB_DOMAIN} is not responding yet. Check DNS and give Caddy time to issue the certificate."
+        warn "https://${SUB_DOMAIN} пока не отвечает. Проверьте DNS и дайте Caddy время выпустить сертификат."
     fi
 
     verify_temporary_subscription_link
@@ -957,43 +957,43 @@ deploy_subscription_stack() {
 print_summary() {
     cat <<EOF
 
-Deployment completed.
+Установка завершена.
 
-Domains:
-- Admin panel: https://${ADMIN_DOMAIN}
-- Subscription page: https://${SUB_DOMAIN}
+Домены:
+- Админ-панель: https://${ADMIN_DOMAIN}
+- Страница подписок: https://${SUB_DOMAIN}
 
-Local directories:
+Локальные директории:
 - ${PANEL_DIR}
 - ${SUB_DIR}
 - ${PROXY_DIR}
 
-Containers:
+Контейнеры:
 - remnawave
 - remnawave-db
 - remnawave-redis
 - remnawave-subscription-page
 - remnawave-caddy
 
-Useful commands:
+Полезные команды:
 - docker logs -f remnawave
 - docker logs -f remnawave-subscription-page
 - docker compose -f ${PANEL_DIR}/docker-compose.yml pull
 - docker compose -f ${PANEL_DIR}/docker-compose.yml up -d
-- Deployment log: ${LOG_FILE}
+- Лог установки: ${LOG_FILE}
 
-Note:
-- The root URL https://${SUB_DOMAIN} may return HTTP 502 if you only use individual subscription links.
+Важно:
+- Корневой URL https://${SUB_DOMAIN} может возвращать HTTP 502, если вы используете только персональные ссылки подписки.
 
 EOF
 
     if [[ "$ENABLE_TEMP_USER_CHECK" == "true" && -n "$TEMP_VERIFY_SUB_URL" ]]; then
         cat <<EOF
-Verification:
-- Temporary user: ${TEMP_VERIFY_USERNAME}
-- Temporary subscription URL: ${TEMP_VERIFY_SUB_URL}
-- Verification result: ${TEMP_VERIFY_RESULT}
-- Temporary user deleted automatically: $(bool_to_yes_no "$TEMP_VERIFY_USER_DELETED")
+Проверка:
+- Временный пользователь: ${TEMP_VERIFY_USERNAME}
+- Временная ссылка подписки: ${TEMP_VERIFY_SUB_URL}
+- Результат проверки: ${TEMP_VERIFY_RESULT}
+- Временный пользователь удалён автоматически: $(bool_to_yes_no "$TEMP_VERIFY_USER_DELETED")
 
 EOF
     fi
@@ -1005,7 +1005,7 @@ main() {
     require_supported_os
 
     print_intro
-    start_stage "Collect configuration" "We will gather the domains, firewall SSH port, and verification preferences."
+    start_stage "Сбор конфигурации" "Сейчас соберём домены и проверим базовые параметры установки."
     prompt_main_inputs
     prompt_install_mode
     show_configuration_summary
@@ -1016,37 +1016,37 @@ main() {
         show_dns_warning_if_needed
     fi
 
-    start_stage "Prepare system packages" "Installing the base dependencies and Docker stack."
+    start_stage "Подготовка пакетов" "Устанавливаю базовые зависимости и Docker."
     install_base_packages
     install_docker
 
-    start_stage "Prepare ports and firewall" "Opening the required ports and clearing conflicting listeners when needed."
+    start_stage "Подготовка портов и firewall" "Открою нужные порты и освобожу конфликтующие слушатели, если это потребуется."
     cleanup_existing_remnawave
-    free_port 80 "HTTP for certificate issuance"
-    free_port 443 "HTTPS for the panel and the subscription page"
-    free_port 3000 "local panel port"
-    free_port 3001 "local panel metrics port"
-    free_port 3010 "local subscription page port"
-    free_port 6767 "local Postgres container port"
+    free_port 80 "HTTP для выпуска сертификата"
+    free_port 443 "HTTPS для панели и страницы подписок"
+    free_port 3000 "локальный порт панели"
+    free_port 3001 "локальный порт метрик панели"
+    free_port 3010 "локальный порт страницы подписок"
+    free_port 6767 "локальный порт контейнера Postgres"
 
     configure_firewall
     prepare_workdirs
 
-    start_stage "Deploy panel" "Downloading the official panel files and starting Remnawave."
+    start_stage "Развёртывание панели" "Скачиваю официальные файлы панели и запускаю Remnawave."
     fetch_official_panel_files
     configure_panel_env
     deploy_panel_stack
 
-    start_stage "Enable HTTPS" "Starting Caddy and requesting certificates for the admin domain."
+    start_stage "Включение HTTPS" "Запускаю Caddy и запрашиваю сертификаты для домена админ-панели."
     deploy_proxy_panel_only
 
-    start_stage "Manual admin step" "Create the superadmin in the panel and then generate the API token."
+    start_stage "Ручной шаг в панели" "Создайте superadmin в панели, затем сгенерируйте API токен."
     pause_for_superadmin_and_api_token
 
-    start_stage "Deploy subscription page" "Starting the subscription page and wiring the public sub domain."
+    start_stage "Развёртывание страницы подписок" "Запускаю страницу подписок и подключаю публичный домен."
     deploy_subscription_stack
 
-    start_stage "Finish" "Printing the final summary and useful follow-up details."
+    start_stage "Финиш" "Печатаю итоговую сводку и полезные дальнейшие команды."
     print_summary
 }
 

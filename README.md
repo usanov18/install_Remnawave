@@ -1,84 +1,97 @@
-# Remnawave Install Script
+# Скрипт установки Remnawave
 
-Interactive install script for `Remnawave panel + subscription page` on one server.
+Интерактивный скрипт для установки `Remnawave panel + страницы подписок` на один сервер.
 
-It is made for the simple flow:
+Сценарий работы максимально простой:
 
-1. Start the script on a clean Ubuntu or Debian server.
-2. Enter the admin panel domain.
-3. Enter the subscription domain.
-4. Wait until the script asks for the API token.
-5. Create the token in the panel and paste it back.
-6. Let the script finish the deployment.
+1. Запускаете скрипт на чистом сервере Ubuntu или Debian.
+2. Вводите домен админ-панели.
+3. Вводите домен страницы подписок.
+4. Ждёте, пока скрипт сам поднимет панель и HTTPS.
+5. Когда скрипт попросит токен, создаёте его в панели и вставляете в терминал.
+6. Скрипт сам завершает установку.
 
-## What The Script Does
+## Что делает скрипт
 
-`deploy-remnawave.sh` automatically:
+`deploy-remnawave.sh` автоматически:
 
-- installs Docker, Docker Compose, UFW, curl, jq, openssl, and base packages;
-- opens the required firewall ports;
-- can free busy ports when they block the install;
-- downloads the current official Remnawave compose files;
-- starts the panel, Postgres, and Valkey;
-- configures HTTPS with Caddy;
-- pauses only for the manual `superadmin + API token` step;
-- starts the subscription page after you paste the token;
-- can create a temporary test user and check a real subscription link;
-- writes detailed command output to `/var/log/remnawave-deploy.log`.
+- устанавливает Docker, Docker Compose, UFW, curl, jq, openssl и базовые пакеты;
+- открывает нужные порты в firewall;
+- умеет освобождать занятые порты, если они мешают установке;
+- скачивает актуальные compose-файлы из официальных репозиториев Remnawave;
+- поднимает panel, Postgres и Valkey;
+- настраивает HTTPS через Caddy;
+- останавливается только на ручном шаге `superadmin + API token`;
+- после вставки токена поднимает страницу подписок;
+- может создать временного тестового пользователя и проверить реальную subscription-ссылку;
+- пишет подробный технический лог в `/var/log/remnawave-deploy.log`.
 
-The script does not deploy a Remnawave node.
+Скрипт не устанавливает Remnawave node.
 
-## Before You Start
+## Что такое Caddy
 
-You need:
+В этом сценарии `Caddy` это веб-сервер и reverse proxy перед панелью и страницей подписок.
 
-- a server with Ubuntu or Debian;
-- `sudo` or root access;
-- two DNS `A` records already pointed to that server:
+Проще говоря, он:
+
+- принимает входящие запросы снаружи на `80` и `443`;
+- выпускает и обновляет HTTPS сертификаты;
+- проксирует трафик дальше внутрь, в контейнеры Remnawave.
+
+То есть именно Caddy делает так, что панель открывается как нормальный сайт по вашему домену и по HTTPS.
+
+## Что нужно перед запуском
+
+Нужно подготовить:
+
+- сервер на Ubuntu или Debian;
+- доступ `sudo` или root;
+- две DNS `A` записи, уже направленные на этот сервер:
 - `admin.your-domain.com -> your-server-ip`
 - `sub.your-domain.com -> your-server-ip`
 
-## Run
+## Как запустить
 
-Upload `deploy-remnawave.sh` to the server and run:
+На любом сервере можно запустить так:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/usanov18/install_Remnawave/main/deploy-remnawave.sh -o deploy-remnawave.sh
 sudo bash deploy-remnawave.sh
 ```
 
-On a normal fresh run, the script asks only for:
+При обычном запуске на чистом сервере скрипт спрашивает только:
 
-- the admin panel domain;
-- the subscription domain;
-- the API token later, after the panel is already up.
+- домен админ-панели;
+- домен страницы подписок;
+- API токен позже, когда панель уже запущена.
 
-It can ask extra confirmation questions only if:
+Дополнительные подтверждения появятся только если:
 
-- old Remnawave data is already found;
-- ports are busy and must be freed;
-- DNS is still pointed to another server.
+- на сервере уже найдены старые данные Remnawave;
+- нужные порты заняты и их нужно освободить;
+- DNS ещё указывает не на этот сервер.
 
-## Manual Step
+## Ручной шаг во время установки
 
-When the script pauses:
+Когда скрипт остановится:
 
-1. Open `https://<your-admin-domain>`.
-2. Create the `superadmin`.
-3. Open `Remnawave Settings -> API Tokens`.
-4. Create an API token for the subscription page.
-5. Paste that token back into the terminal.
+1. Откройте `https://<ваш-домен-админки>`.
+2. Создайте `superadmin`.
+3. Откройте `Remnawave Settings -> API Tokens`.
+4. Создайте API токен для страницы подписок.
+5. Вставьте этот токен обратно в терминал.
 
-After that, the script continues on its own.
+После этого скрипт снова продолжит работу сам.
 
-## Important Note About The Subscription Domain
+## Важный момент по sub-домену
 
-The root URL `https://<your-sub-domain>` can return `502` and still be acceptable.
+Корневой URL `https://<ваш-домен-страницы-подписок>` может отдавать `502`, и это не всегда ошибка.
 
-That usually means the subscription page is used through individual user subscription links, not through a public landing page on the root domain.
+Такое поведение нормально, если страница подписок используется только через персональные subscription-ссылки пользователей, а не как обычная публичная страница на корне домена.
 
-## Advanced Optional Variables
+## Необязательные переменные окружения
 
-The interactive wizard keeps the default flow short, but you can override a few things before launch:
+По умолчанию мастер установки старается задавать минимум вопросов, но при желании можно заранее переопределить несколько параметров:
 
 ```bash
 export RW_LETSENCRYPT_EMAIL="you@example.com"
@@ -88,9 +101,9 @@ export RW_AUTO_DELETE_TEMP_USER="true"
 sudo bash deploy-remnawave.sh
 ```
 
-## Sources
+## Источники
 
-- [Remnawave panel docs](https://docs.rw/docs/install/remnawave-panel)
-- [Environment variables](https://docs.rw/docs/install/environment-variables)
+- [Документация по установке панели](https://docs.rw/docs/install/remnawave-panel)
+- [Переменные окружения](https://docs.rw/docs/install/environment-variables)
 - [backend docker-compose-prod.yml](https://github.com/remnawave/backend/blob/main/docker-compose-prod.yml)
 - [subscription-page docker-compose-prod.yml](https://github.com/remnawave/subscription-page/blob/main/docker-compose-prod.yml)
