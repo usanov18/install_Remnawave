@@ -843,7 +843,7 @@ prompt_main_inputs() {
 
     prompt_value ADMIN_DOMAIN "Домен админ-панели" "$DEFAULT_ADMIN_DOMAIN"
     prompt_value SUB_DOMAIN "Домен страницы подписок" "$DEFAULT_SUB_DOMAIN"
-    LETSENCRYPT_EMAIL="${RW_LETSENCRYPT_EMAIL:-}"
+    prompt_value LETSENCRYPT_EMAIL "Email для Let's Encrypt (можно оставить пустым)" "${RW_LETSENCRYPT_EMAIL:-}"
     SSH_PORT="${RW_SSH_PORT:-$SSH_PORT}"
     ENABLE_TEMP_USER_CHECK="${RW_ENABLE_TEMP_USER_CHECK:-true}"
     AUTO_DELETE_TEMP_USER="${RW_AUTO_DELETE_TEMP_USER:-true}"
