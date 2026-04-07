@@ -275,6 +275,13 @@ first_existing_path() {
     return 1
 }
 
+find_latest_home_migration_archive() {
+    local latest_archive=""
+
+    latest_archive="$(ls -1t /home/remnawave-migration-*.tar.gz 2>/dev/null | head -n 1 || true)"
+    printf '%s' "$latest_archive"
+}
+
 trim_quotes() {
     local value="$1"
 
@@ -508,7 +515,7 @@ prompt_backup_inputs() {
     prompt_value PG_DB "Postgres database старой панели" "${PG_DB:-remnawave}"
 
     timestamp="$(date +%Y%m%d-%H%M%S)"
-    prompt_value ARCHIVE_PATH "Куда сохранить архив миграции" "/root/remnawave-migration-${timestamp}.tar.gz"
+    prompt_value ARCHIVE_PATH "Куда сохранить архив миграции" "/home/remnawave-migration-${timestamp}.tar.gz"
 
     BACKUP_PANEL_DOMAIN="$(get_env_value "$SOURCE_PANEL_ENV" "PANEL_DOMAIN")"
     BACKUP_SUB_DOMAIN="$(get_env_value "$SOURCE_PANEL_ENV" "SUB_PUBLIC_DOMAIN")"
@@ -517,7 +524,10 @@ prompt_backup_inputs() {
 }
 
 prompt_restore_inputs() {
-    prompt_value ARCHIVE_PATH "Путь к архиву миграции на новом сервере" ""
+    local suggested_archive=""
+
+    suggested_archive="$(find_latest_home_migration_archive)"
+    prompt_value ARCHIVE_PATH "Путь к архиву миграции на новом сервере" "${suggested_archive:-/home/remnawave-migration-YYYYMMDD-HHMMSS.tar.gz}"
     [[ -n "$ARCHIVE_PATH" ]] || die "Нужно указать путь к архиву миграции."
     [[ -f "$ARCHIVE_PATH" ]] || die "Архив не найден: ${ARCHIVE_PATH}"
 
@@ -712,7 +722,7 @@ show_backup_summary() {
 - ${ARCHIVE_PATH}
 
 Дальше:
-1. Скопируйте архив на новый сервер.
+1. Скопируйте архив на новый сервер в /home/.
 2. Разверните новую чистую установку через deploy-remnawave.sh.
 3. На новом сервере запустите этот же скрипт в режиме restore.
 
