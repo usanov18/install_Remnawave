@@ -3,6 +3,7 @@
 *.bak
 *.dump
 remnawave-migration-*.tar.gz
+remnawave-update-backup-*.tar.gz
 
 .env
 .env.*
