@@ -481,6 +481,15 @@ get_env_value() {
     trim_wrapped_quotes "$raw_value"
 }
 
+sanitize_single_line_value() {
+    local value="$1"
+
+    value="${value//$'\r'/}"
+    value="${value//$'\n'/}"
+    value="${value//$'\t'/}"
+    printf '%s' "$value"
+}
+
 random_string() {
     local length="$1"
     local bytes=$(( (length + 1) / 2 ))
@@ -571,9 +580,16 @@ fetch_official_sub_files() {
 }
 
 configure_sub_env() {
+    local sanitized_api_token=""
+
+    sanitized_api_token="$(sanitize_single_line_value "$API_TOKEN")"
+    if [[ "$sanitized_api_token" != "$API_TOKEN" ]]; then
+        note "В API токене были скрытые символы перевода строки или табуляции. Удаляю их автоматически."
+    fi
+
     set_env_value "$SUB_DIR/.env" "APP_PORT" "3010"
     set_env_value "$SUB_DIR/.env" "REMNAWAVE_PANEL_URL" "http://remnawave:3000"
-    set_env_value "$SUB_DIR/.env" "REMNAWAVE_API_TOKEN" "$API_TOKEN"
+    set_env_value "$SUB_DIR/.env" "REMNAWAVE_API_TOKEN" "$sanitized_api_token"
     set_env_value "$SUB_DIR/.env" "CUSTOM_SUB_PREFIX" ""
     set_env_value "$SUB_DIR/.env" "CADDY_AUTH_API_TOKEN" ""
     set_env_value "$SUB_DIR/.env" "CLOUDFLARE_ZERO_TRUST_CLIENT_ID" "\"\""
@@ -976,6 +992,7 @@ EOF
 
     while true; do
         prompt_value API_TOKEN "Вставьте API токен Remnawave" "" "true"
+        API_TOKEN="$(sanitize_single_line_value "$API_TOKEN")"
         if [[ -n "$API_TOKEN" ]]; then
             success "API токен получен."
             break
