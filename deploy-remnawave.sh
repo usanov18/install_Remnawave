@@ -37,6 +37,7 @@ TEMP_VERIFY_USER_DELETED="false"
 LAST_API_RESPONSE_CODE=""
 LAST_API_RESPONSE_BODY=""
 EXISTING_PANEL_ENV_BACKUP=""
+DEFAULT_API_TOKEN_FILE="/home/remnawave-api-token.txt"
 
 C_RESET=""
 C_BOLD=""
@@ -487,6 +488,19 @@ sanitize_single_line_value() {
     value="${value//$'\r'/}"
     value="${value//$'\n'/}"
     value="${value//$'\t'/}"
+    printf '%s' "$value"
+}
+
+read_token_from_file() {
+    local file_path="$1"
+    local value=""
+
+    [[ -f "$file_path" ]] || return 1
+    value="$(head -n 1 "$file_path" 2>/dev/null || true)"
+    value="$(sanitize_single_line_value "$value")"
+    value="${value// /}"
+
+    [[ -n "$value" ]] || return 1
     printf '%s' "$value"
 }
 
@@ -977,6 +991,9 @@ deploy_proxy_panel_only() {
 }
 
 pause_for_superadmin_and_api_token() {
+    local token_file_override=""
+    local token_from_file=""
+
     cat <<EOF
 
 Ручной шаг в панели:
@@ -984,20 +1001,49 @@ pause_for_superadmin_and_api_token() {
 2. Создайте superadmin
 3. Откройте Remnawave Settings -> API Tokens
 4. Создайте API токен для страницы подписок
-5. Вернитесь сюда и вставьте токен
+5. Вернитесь сюда и передайте токен любым удобным способом:
+   - вставьте его в prompt ниже;
+   - или сохраните его одной строкой в ${DEFAULT_API_TOKEN_FILE};
+   - или заранее задайте RW_API_TOKEN / RW_API_TOKEN_FILE.
 
-Во время вставки ввод токена скрыт. Это нормально.
+Во время прямой вставки ввод токена скрыт. Это нормально.
 
 EOF
 
     while true; do
+        if [[ -n "${RW_API_TOKEN:-}" ]]; then
+            API_TOKEN="$(sanitize_single_line_value "$RW_API_TOKEN")"
+            if [[ -n "$API_TOKEN" ]]; then
+                success "API токен получен из переменной окружения RW_API_TOKEN."
+                break
+            fi
+        fi
+
+        token_file_override="${RW_API_TOKEN_FILE:-}"
+        if [[ -n "$token_file_override" ]]; then
+            token_from_file="$(read_token_from_file "$token_file_override" || true)"
+            if [[ -n "$token_from_file" ]]; then
+                API_TOKEN="$token_from_file"
+                success "API токен получен из файла ${token_file_override}."
+                break
+            fi
+            warn "Файл из RW_API_TOKEN_FILE пока не найден или пуст: ${token_file_override}"
+        fi
+
+        token_from_file="$(read_token_from_file "$DEFAULT_API_TOKEN_FILE" || true)"
+        if [[ -n "$token_from_file" ]]; then
+            API_TOKEN="$token_from_file"
+            success "API токен получен из файла ${DEFAULT_API_TOKEN_FILE}."
+            break
+        fi
+
         prompt_value API_TOKEN "Вставьте API токен Remnawave" "" "true"
         API_TOKEN="$(sanitize_single_line_value "$API_TOKEN")"
         if [[ -n "$API_TOKEN" ]]; then
             success "API токен получен."
             break
         fi
-        warn "API токен не может быть пустым."
+        warn "API токен не может быть пустым. Можно также положить его в ${DEFAULT_API_TOKEN_FILE} и просто нажать Enter ещё раз."
     done
 }
 

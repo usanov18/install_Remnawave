@@ -195,7 +195,10 @@ sudo bash update-remnawave.sh
 2. Создайте `superadmin`.
 3. Откройте `Remnawave Settings -> API Tokens`.
 4. Создайте API токен для страницы подписок.
-5. Вставьте этот токен обратно в терминал.
+5. Передайте этот токен обратно в скрипт одним из способов:
+   - вставьте его в терминал;
+   - или сохраните его одной строкой в `/home/remnawave-api-token.txt`;
+   - или заранее задайте `RW_API_TOKEN` / `RW_API_TOKEN_FILE`.
 
 После этого скрипт снова продолжит работу сам.
 
@@ -216,6 +219,9 @@ export RW_LETSENCRYPT_EMAIL="you@example.com"
 export RW_SSH_PORT="13022"
 export RW_ENABLE_TEMP_USER_CHECK="true"
 export RW_AUTO_DELETE_TEMP_USER="true"
+# Если SSH нестабилен и неудобно вставлять токен в tmux:
+# export RW_API_TOKEN="eyJ..."
+# или export RW_API_TOKEN_FILE="/home/remnawave-api-token.txt"
 sudo bash deploy-remnawave.sh
 ```
 
