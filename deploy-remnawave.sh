@@ -36,6 +36,7 @@ TEMP_VERIFY_RESULT="skipped"
 TEMP_VERIFY_USER_DELETED="false"
 LAST_API_RESPONSE_CODE=""
 LAST_API_RESPONSE_BODY=""
+EXISTING_PANEL_ENV_BACKUP=""
 
 C_RESET=""
 C_BOLD=""
@@ -453,11 +454,54 @@ set_env_value() {
     fi
 }
 
+trim_wrapped_quotes() {
+    local value="$1"
+
+    if [[ "$value" =~ ^\".*\"$ ]] || [[ "$value" =~ ^\'.*\'$ ]]; then
+        value="${value:1:${#value}-2}"
+    fi
+
+    printf '%s' "$value"
+}
+
+get_env_value() {
+    local file_path="$1"
+    local key="$2"
+    local raw_value=""
+
+    raw_value="$(awk -F= -v wanted_key="$key" '
+        $0 ~ /^[[:space:]]*#/ { next }
+        $1 == wanted_key {
+            sub(/^[^=]*=/, "", $0)
+            print $0
+            exit
+        }
+    ' "$file_path" 2>/dev/null || true)"
+
+    trim_wrapped_quotes "$raw_value"
+}
+
 random_string() {
     local length="$1"
     local bytes=$(( (length + 1) / 2 ))
 
     openssl rand -hex "$bytes" | cut -c "1-${length}"
+}
+
+backup_existing_panel_env_if_needed() {
+    if [[ "$CLEAN_INSTALL" == "true" ]]; then
+        EXISTING_PANEL_ENV_BACKUP=""
+        return 0
+    fi
+
+    if [[ -f "$PANEL_DIR/.env" ]]; then
+        EXISTING_PANEL_ENV_BACKUP="$(mktemp /tmp/remnawave-panel-env.XXXXXX)"
+        cp "$PANEL_DIR/.env" "$EXISTING_PANEL_ENV_BACKUP"
+        chmod 600 "$EXISTING_PANEL_ENV_BACKUP"
+        note "Найдён существующий panel .env. Сохраню его секреты и пароль базы для безопасного повторного запуска."
+    else
+        EXISTING_PANEL_ENV_BACKUP=""
+    fi
 }
 
 fetch_official_panel_files() {
@@ -474,13 +518,27 @@ configure_panel_env() {
     local postgres_password=""
     local jwt_auth_secret=""
     local jwt_api_secret=""
+    local metrics_user="metrics"
     local metrics_pass=""
     local database_url=""
 
-    postgres_password="$(random_string 32)"
-    jwt_auth_secret="$(random_string 64)"
-    jwt_api_secret="$(random_string 64)"
-    metrics_pass="$(random_string 24)"
+    if [[ -n "$EXISTING_PANEL_ENV_BACKUP" && -f "$EXISTING_PANEL_ENV_BACKUP" ]]; then
+        postgres_user="$(get_env_value "$EXISTING_PANEL_ENV_BACKUP" "POSTGRES_USER")"
+        postgres_db="$(get_env_value "$EXISTING_PANEL_ENV_BACKUP" "POSTGRES_DB")"
+        postgres_password="$(get_env_value "$EXISTING_PANEL_ENV_BACKUP" "POSTGRES_PASSWORD")"
+        jwt_auth_secret="$(get_env_value "$EXISTING_PANEL_ENV_BACKUP" "JWT_AUTH_SECRET")"
+        jwt_api_secret="$(get_env_value "$EXISTING_PANEL_ENV_BACKUP" "JWT_API_TOKENS_SECRET")"
+        metrics_user="$(get_env_value "$EXISTING_PANEL_ENV_BACKUP" "METRICS_USER")"
+        metrics_pass="$(get_env_value "$EXISTING_PANEL_ENV_BACKUP" "METRICS_PASS")"
+    fi
+
+    postgres_user="${postgres_user:-remnawave}"
+    postgres_db="${postgres_db:-remnawave}"
+    postgres_password="${postgres_password:-$(random_string 32)}"
+    jwt_auth_secret="${jwt_auth_secret:-$(random_string 64)}"
+    jwt_api_secret="${jwt_api_secret:-$(random_string 64)}"
+    metrics_user="${metrics_user:-metrics}"
+    metrics_pass="${metrics_pass:-$(random_string 24)}"
     database_url="postgresql://${postgres_user}:${postgres_password}@remnawave-db:5432/${postgres_db}"
 
     set_env_value "$PANEL_DIR/.env" "APP_PORT" "3000"
@@ -495,7 +553,7 @@ configure_panel_env() {
     set_env_value "$PANEL_DIR/.env" "PANEL_DOMAIN" "$ADMIN_DOMAIN"
     set_env_value "$PANEL_DIR/.env" "FRONT_END_DOMAIN" "https://${ADMIN_DOMAIN}"
     set_env_value "$PANEL_DIR/.env" "SUB_PUBLIC_DOMAIN" "$SUB_DOMAIN"
-    set_env_value "$PANEL_DIR/.env" "METRICS_USER" "metrics"
+    set_env_value "$PANEL_DIR/.env" "METRICS_USER" "$metrics_user"
     set_env_value "$PANEL_DIR/.env" "METRICS_PASS" "$metrics_pass"
     set_env_value "$PANEL_DIR/.env" "IS_DOCS_ENABLED" "false"
     set_env_value "$PANEL_DIR/.env" "SWAGGER_PATH" "/docs"
@@ -1033,6 +1091,7 @@ main() {
     prepare_workdirs
 
     start_stage "Развёртывание панели" "Скачиваю официальные файлы панели и запускаю Remnawave."
+    backup_existing_panel_env_if_needed
     fetch_official_panel_files
     configure_panel_env
     deploy_panel_stack
