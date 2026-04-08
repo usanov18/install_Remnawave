@@ -644,15 +644,15 @@ EOF
 }
 
 docker_compose_panel() {
-    docker compose -f "$PANEL_DIR/docker-compose.yml" "$@"
+    COMPOSE_ANSI=never COMPOSE_PROGRESS=plain docker compose -f "$PANEL_DIR/docker-compose.yml" "$@"
 }
 
 docker_compose_sub() {
-    docker compose -f "$SUB_DIR/docker-compose.yml" -p remnawave-subscription "$@"
+    COMPOSE_ANSI=never COMPOSE_PROGRESS=plain docker compose -f "$SUB_DIR/docker-compose.yml" -p remnawave-subscription "$@"
 }
 
 docker_compose_proxy() {
-    docker compose -f "$PROXY_DIR/docker-compose.yml" -p remnawave-proxy "$@"
+    COMPOSE_ANSI=never COMPOSE_PROGRESS=plain docker compose -f "$PROXY_DIR/docker-compose.yml" -p remnawave-proxy "$@"
 }
 
 cleanup_existing_remnawave() {
@@ -680,14 +680,24 @@ wait_for_container_health() {
     local timeout_seconds="${2:-240}"
     local elapsed="0"
     local status=""
+    local last_reported=""
 
     while (( elapsed < timeout_seconds )); do
         status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_name" 2>/dev/null || true)"
         case "$status" in
             healthy|running)
+                if [[ "$last_reported" != "$status" ]]; then
+                    success "Контейнер ${container_name} готов: ${status}."
+                fi
                 return 0
                 ;;
         esac
+
+        if [[ "$status" != "$last_reported" ]]; then
+            log "Жду готовность контейнера ${container_name}: статус=${status:-unknown}, прошло ${elapsed}s из ${timeout_seconds}s."
+            last_reported="$status"
+        fi
+
         sleep 5
         elapsed=$((elapsed + 5))
     done
